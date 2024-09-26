@@ -99,21 +99,22 @@
 		};
 	};
 
-	hdmi: connector {
-		compatible = "hdmi-connector";
-		label = "hdmi";
-		type = "a";
-
-		port {
-			hdmi_connector_in: endpoint {
-				remote-endpoint = <&adv753x_out>;
-			};
-		};
-	};
-
 	memory@80000000 {
 		device_type = "memory";
 		reg = <0x0 0x80000000 0x1 0x0>;
+	};
+
+	panel_ili9881: panel-ili9881 {
+		compatible = "startek,kd050hdfia020", "ilitek,ili9881c";
+		reset-gpios = <&gpiog 14 GPIO_ACTIVE_LOW>;
+		power-supply = <&scmi_v3v3>;
+		status = "okay";
+
+		port {
+			mipi_panel_in: endpoint {
+				remote-endpoint = <&dsi_out1>;
+			};
+		};
 	};
 
 	panel_lvds: panel-lvds {
@@ -150,13 +151,12 @@
 		gpios = <&gpioi 5 GPIO_ACTIVE_HIGH>;
 		default-on;
 		default-brightness-level = <1>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	sound: sound {
 		compatible = "audio-graph-card";
 		label = "STM32MP25-EV1";
-		dais = <&i2s2_port>;
 		status = "disabled";
 	};
 };
@@ -241,40 +241,6 @@
 	status = "okay";
 };
 
-&csi2host {
-	vdd-supply =  <&scmi_vddcore>;
-	vdda18-supply = <&scmi_v1v8>;
-	status = "okay";
-	ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		port@0 {
-			reg = <0>;
-			csi2host_sink: endpoint {
-				remote-endpoint = <&imx335_ep>;
-				data-lanes = <0 1>;
-				bus-type = <4>;
-			};
-		};
-		port@1 {
-			reg = <1>;
-			csi2host_source: endpoint {
-				remote-endpoint = <&dcmipp_0>;
-			};
-		};
-	};
-};
-
-&dcmipp {
-	status = "okay";
-	port {
-		dcmipp_0: endpoint {
-			remote-endpoint = <&csi2host_source>;
-			bus-type = <4>;
-		};
-	};
-};
-
 &dsi {
 	vdd-supply =  <&scmi_vddcore>;
 	vdda18-supply = <&scmi_v1v8>;
@@ -294,7 +260,7 @@
 		port@1 {
 			reg = <1>;
 			dsi_out1: endpoint {
-				remote-endpoint = <&adv753x_in>;
+				remote-endpoint = <&mipi_panel_in>;
 			};
 		};
 	};
@@ -379,82 +345,6 @@
 	/* spare dmas for other usage */
 	/delete-property/dmas;
 	/delete-property/dma-names;
-
-	imx335: imx335@1a {
-		compatible = "sony,imx335";
-		reg = <0x1a>;
-		clocks = <&clk_ext_camera>;
-		reset-gpios = <&gpioi 7 (GPIO_ACTIVE_HIGH | GPIO_PUSH_PULL)>;
-		powerdown-gpios = <&gpioi 0 (GPIO_ACTIVE_HIGH | GPIO_PUSH_PULL)>;
-		status = "okay";
-
-		port {
-			imx335_ep: endpoint {
-				remote-endpoint = <&csi2host_sink>;
-				clock-lanes = <0>;
-				data-lanes = <1 2>;
-				link-frequencies = /bits/ 64 <594000000>;
-			};
-		};
-	};
-
-	adv753x: hdmi@3d {
-		/*
-		 * With MB1232 board, use "adi,adv7533" (1080p30)
-		 * With MB1752 board, use "adi,adv7535" (1080p60)
-		 */
-		compatible = "adi,adv7533";
-		reg = <0x3d>, <0x3c>, <0x3f>, <0x38>;
-		reg-names = "main", "cec", "edid", "packet";
-		clocks = <&cec_clock>;
-		clock-names = "cec";
-		interrupt-parent = <&gpiod>;
-		interrupts = <10 IRQ_TYPE_EDGE_FALLING>;
-		status = "disabled";
-		adi,dsi-lanes = <4>;
-		reset-gpios = <&gpiog 14 GPIO_ACTIVE_LOW>;
-		avdd-supply = <&scmi_v1v8>;
-		dvdd-supply = <&scmi_v1v8>;
-		pvdd-supply = <&scmi_v1v8>;
-		a2vdd-supply = <&scmi_v1v8>;
-		v3p3-supply = <&scmi_v3v3>;
-		v1p2-supply = <&scmi_v1v8>;
-
-		ports {
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			port@0 {
-				reg = <0>;
-				adv753x_in: endpoint {
-					remote-endpoint = <&dsi_out1>;
-				};
-			};
-
-			port@1 {
-				reg = <1>;
-				adv753x_out: endpoint {
-					remote-endpoint = <&hdmi_connector_in>;
-				};
-			};
-
-			port@2 {
-				reg = <2>;
-				adv753x_tx_endpoint: endpoint {
-					remote-endpoint = <&i2s2_endpoint>;
-				};
-			};
-		};
-	};
-
-	ili2511: ili2511@41 {
-		compatible = "ilitek,ili251x";
-		reg = <0x41>;
-		interrupt-parent = <&gpioi>;
-		interrupts = <13 IRQ_TYPE_EDGE_FALLING>;
-		reset-gpios = <&gpiog 14 GPIO_ACTIVE_LOW>;
-		status = "okay";
-	};
 };
 
 &i2c8 {
@@ -475,14 +365,6 @@
 	pinctrl-0 = <&i2s2_pins_a>;
 	pinctrl-1 = <&i2s2_sleep_pins_a>;
 	status = "disabled";
-
-	i2s2_port: port {
-		i2s2_endpoint: endpoint {
-			remote-endpoint = <&adv753x_tx_endpoint>;
-			format = "i2s";
-			mclk-fs = <256>;
-		};
-	};
 };
 
 &ipcc1 {
